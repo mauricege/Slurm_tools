@@ -9,7 +9,7 @@
 export SEND_EMAIL=0
 SUBSCRIBERS=root@localhost
 # Report file prefix
-REPORT_PREFIX=/tmp/Slurm_report_month_
+REPORT_PREFIX=/tmp/slurm-reports
 # Change the date/time format in report header for readability (formats in "man strftime")
 export SLURM_TIME_FORMAT="%d-%b-%Y_%R"
 # End of CONFIGURE lines
@@ -17,7 +17,7 @@ export SLURM_TIME_FORMAT="%d-%b-%Y_%R"
 #
 # Specify the accounting reports
 #
-FLAGS="-t hourper --tres=cpu,gpu"
+FLAGS="-t hourper --tres=cpu,gres/gpu"
 TYPE="AccountUtilizationByUser"
 OPTIONS="format=Accounts,Cluster,Login,Proper%30,TresName,Used tree"
 
@@ -59,22 +59,22 @@ while getopts "a:s:e:r:mcwh" options; do
 			echo End date $OPTARG
 			REPORT_NAME=${START}_${END}
 			;;
-		c )	export START=`date +%m01%y`
+		c )	export START=`date -d +%m01%y`
 			export END=`date +%m%d%y`
 			echo Select current month from $START until $END
-			REPORT_NAME=Current_month
+			REPORT_NAME=`date +%B`
 			;;
 		w )	export START=`date -d "last week" +%m%d%y`
-			export END=`date +%m%d%y`
+			export END=`date -d "this week" +%m%d%y`
 			echo Select last week from $START until $END
-			REPORT_NAME=Last_week
+			REPORT_NAME="/weekly/$(date -d 'last week' +%y/%m/%d.txt)"
 			;;
 		r )	export REPORTDIR="$OPTARG"
 			echo Copy report to directory $OPTARG
 			;;
-		m )	export SEND_EMAIL=1
-			echo Send report by E-mail to $SUBSCRIBERS
-			;;
+		# m )	export SEND_EMAIL=1
+		# 	echo Send report by E-mail to $SUBSCRIBERS
+		# 	;;
 		V ) echo $my_version
 			exit 1;;
 		h|? ) usage
@@ -98,9 +98,9 @@ fi
 # Test if either START or END are empty strings
 if test -z "$START" -o -z "$END"
 then
-	MONTH=`date -d "last month" +%B`
-	YEAR=`date -d "last month" +%Y`
-	REPORT_NAME=${MONTH}_${YEAR}
+	MONTH=`date -d "last month" +%m`
+	YEAR=`date -d "last month" +%y`
+	REPORT_NAME="/monthly/${YEAR}/${MONTH}.txt"
 	# START=`date -d "-1 month -$(($(date +%-d)-1)) day" +%m%d%y`
 	START=`date -d "last month" +%m01%y`
 	# END=`date -d "-$(date +%d) day" +%D`
@@ -108,10 +108,11 @@ then
 fi
 
 # Generate accounting report
-
+echo $SLURM_CONF
 export SYSTEMNAME=`scontrol show config | grep ClusterName`
 
-REPORT=$REPORT_PREFIX.$REPORT_NAME
+REPORT=$REPORT_PREFIX$REPORT_NAME
+mkdir -p $(dirname $REPORT)
 
 # First report overall statistics 
 sreport cluster utilization Start=$START End=$END -t percent > $REPORT
@@ -120,6 +121,7 @@ echo >> $REPORT
 sreport $FLAGS cluster $TYPE $accountlist Start=$START End=$END $OPTIONS >> $REPORT
 
 echo Report generated to file $REPORT
+cat $REPORT
 
 # Mail monthly report to a list of users (acct_list in /etc/aliases)
 if test $SEND_EMAIL -gt 0
@@ -133,7 +135,8 @@ then
 	if test -d $REPORTDIR
 	then
 		echo Copy ${REPORT} to $REPORTDIR
-		cp -p ${REPORT} $REPORTDIR
+		mkdir -p $(dirname $REPORTDIR$REPORT_NAME)
+		cp -p ${REPORT} $REPORTDIR$REPORT_NAME
 	else
 		echo Report directory $REPORTDIR not accessible!
 		ls -lad $REPORTDIR
