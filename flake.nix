@@ -43,7 +43,7 @@
     {
       inherit overlay;
       nixosModules = {
-        slurmreports = import ./modules/services/slurmreports.nix;
+        slurmreport = import ./modules/services/slurmreport.nix;
       };
     };
 }
