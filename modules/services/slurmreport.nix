@@ -18,7 +18,7 @@ in {
     };
   };
 
-  config = (mkIf cfg.enable {
+  config = mkIf cfg.enable (
     mkMerge [
       (mkIf (elem "monthly" cfg.intervals) {
         systemd.services.slurmreport-monthly = {
@@ -58,5 +58,5 @@ in {
         };
       })
     ];
-  };
+  );
 }
