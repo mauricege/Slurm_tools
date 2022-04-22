@@ -24,7 +24,7 @@ in {
         systemd.services.slurmreport-monthly = {
         serviceConfig.Type = "oneshot";
           environment = {
-            SLURM_CONF = config.services.slurm.etcSlurm;
+            SLURM_CONF = "${config.services.slurm.etcSlurm}/slurm.conf";
           };
           script = ''
             ${pkgs.slurm-tools.slurmreport}/bin/slurmreport -r ${cfg.outputPath}
@@ -43,7 +43,7 @@ in {
         systemd.services.slurmreport-weekly = {
         serviceConfig.Type = "oneshot";
           environment = {
-            SLURM_CONF = config.services.slurm.etcSlurm;
+            SLURM_CONF = "${config.services.slurm.etcSlurm}/slurm.conf";
           };
           script = ''
             ${pkgs.slurm-tools.slurmreport}/bin/slurmreport -w -r ${cfg.outputPath}
