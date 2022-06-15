@@ -35,7 +35,7 @@ in {
           description = "Run slurmreports periodically.";
           wantedBy = [ "timers.target" ]; # enable it & auto start it
           timerConfig = {
-            OnCalendar = "monthly";
+            OnCalendar = "*-*-1 1:00:00";
           };
         };
       })
