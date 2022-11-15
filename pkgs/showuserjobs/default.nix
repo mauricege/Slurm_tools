@@ -9,7 +9,7 @@ stdenv.mkDerivation rec {
 
   installPhase = ''
     mkdir -p $out/bin
-    cp -a showuserlimits $out/bin
+    cp -a showuserjobs $out/bin
     wrapProgram "$out/bin/showuserjobs" --prefix PATH : "${
         lib.makeBinPath [
           gawk

@@ -12,9 +12,9 @@ my_version="pestat Github version"
 
 # CONFIGURE the paths of commands:
 # Directory where Slurm commands live:
-export prefix=/usr/bin
+export prefix=""
 # The awk command
-my_awk=$prefix/awk
+my_awk=awk
 # Job grace time (seconds) before we may flag the node
 export jobgracetime=300
 # Global configuration file for pestat
@@ -157,7 +157,7 @@ while getopts "p:Pu:g:a:q:s:t:n:j:w:m:M:R:CcdhVFf12SETNG" options; do
 				echo "ERROR: Multiple usernames given: $username"
 				exit -1
 			fi
-			if test "`$prefix/sacctmgr -p -n show assoc where users=$username`"
+			if test "`sacctmgr -p -n show assoc where users=$username`"
 			then
 				echo "Select a single Slurm user: $username"
 			else
@@ -175,7 +175,7 @@ while getopts "p:Pu:g:a:q:s:t:n:j:w:m:M:R:CcdhVFf12SETNG" options; do
 			fi
 			;;
 		a )	export accountlist=$OPTARG
-			if test "`$prefix/sacctmgr -n -p show account $accountlist`"
+			if test "`sacctmgr -n -p show account $accountlist`"
 			then
 				echo Select only Slurm account=$accountlist
 			else
@@ -185,7 +185,7 @@ while getopts "p:Pu:g:a:q:s:t:n:j:w:m:M:R:CcdhVFf12SETNG" options; do
 			fi
 			;;
 		q )	export qoslist=$OPTARG
-			if test "`$prefix/sacctmgr -n -p show qos $qoslist`"
+			if test "`sacctmgr -n -p show qos $qoslist`"
 			then
 				echo Select only QOS=$qoslist
 			else
@@ -208,7 +208,7 @@ while getopts "p:Pu:g:a:q:s:t:n:j:w:m:M:R:CcdhVFf12SETNG" options; do
 			;;
 		j )	joblist=$OPTARG
 			# Check if joblist is running in the Slurm queue and squeue displays job information
-			jobfound=`$prefix/squeue -j $joblist -t running -h -O JobID 2>/dev/null`
+			jobfound=`squeue -j $joblist -t running -h -O JobID 2>/dev/null`
 			if test $? -ne 0 -o -z "$jobfound"
 			then
 				echo ERROR: Jobs in the list $joblist are not running in the current Slurm queue
@@ -217,7 +217,7 @@ while getopts "p:Pu:g:a:q:s:t:n:j:w:m:M:R:CcdhVFf12SETNG" options; do
 			echo Select only nodes with jobs in joblist=$joblist
 			# The "readarray" built-in command was introduced in Bash ver.4
 			# See https://www.baeldung.com/linux/join-multiple-lines
-			hostlist="-n `$prefix/squeue -j $joblist -t running -h -O NodeList: | (readarray -t ARRAY; IFS=','; echo "${ARRAY[*]}")`"
+			hostlist="-n `squeue -j $joblist -t running -h -O NodeList: | (readarray -t ARRAY; IFS=','; echo "${ARRAY[*]}")`"
 			;;
 		G )	export printgres=1
 			echo "GPU GRES (Generic Resource) is printed after each jobid"
@@ -330,7 +330,7 @@ export nodegreswidth=`sinfo -h -N $all_partitions $partition $hostlist $statelis
 # Was: $prefix/sinfo -h -N $partition $hostlist $statelist -o "%N %P %C %O %m %e %t %Z %G" | $my_awk '
 # $prefix/sinfo -h -N $partition $hostlist $statelist -O "NodeList: ,Partition: ,CPUsState: ,CPUsLoad: ,Memory: ,FreeMem: ,StateCompact: ,Threads: ,Gres: " | $my_awk '
 # Column size(width)=30 hopefully suffices to separate columns
-$prefix/sinfo -h -N $all_partitions $partition $hostlist $statelist -O "NodeList:30,Partition:30,CPUsState:30,CPUsLoad:30,Memory:30,FreeMem:30,StateCompact:30,Threads:30,Gres:30" | $my_awk '
+sinfo -h -N $all_partitions $partition $hostlist $statelist -O "NodeList:30,Partition:30,CPUsState:30,CPUsLoad:30,Memory:30,FreeMem:30,StateCompact:30,Threads:30,Gres:30" | $my_awk '
 BEGIN {
 	#####################################################################################
 	# Initialization
@@ -386,11 +386,11 @@ BEGIN {
 	# Gather the list of running jobs with squeue
 	# Place JobName last, just in case it is a null string
 	# Place NodeList second before last because it may be very long
-	# JOBLIST = prefix "/squeue -t RUNNING -h -O State,JobID,UserName,GroupName,StartTime,EndTime,TimeUsed,Partition,NumNodes,tres-alloc,NodeList,Name " selection
+	# JOBLIST = prefix "squeue -t RUNNING -h -O State,JobID,UserName,GroupName,StartTime,EndTime,TimeUsed,Partition,NumNodes,tres-alloc,NodeList,Name " selection
 	# Column size(width)=30 hopefully suffices to separate columns
 	# The -O output fields must be space-separated, so use :(space) "sufix" and enclose -O fields in '' (octal 047)
 	# Older Slurm versions before 20.02 do not support the "sufix" after -O and may thus not work correctly
-	JOBLIST = prefix "/squeue -t RUNNING -h -O \047State: ,JobID: ,JobArrayID: ,UserName: ,GroupName: ,StartTime: ,EndTime: ,TimeUsed: ,Partition: ,NumNodes: ,tres-alloc: ,NodeList: ,Name:\047 " selection
+	JOBLIST = prefix "squeue -t RUNNING -h -O \047State: ,JobID: ,JobArrayID: ,UserName: ,GroupName: ,StartTime: ,EndTime: ,TimeUsed: ,Partition: ,NumNodes: ,tres-alloc: ,NodeList: ,Name:\047 " selection
 	while ((JOBLIST | getline) > 0) {
 		JobState=$1
 		JobID=$2

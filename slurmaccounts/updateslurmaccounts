@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+confirm=${1:-1}
+defaultUserSettings=user_settings.conf
+user_settings_conf="${SLURM_USER_SETTINGS:-$defaultUserSettings}"
+
+# Slurm account configuration file:
+defaultAccountSettings=accounts.conf
+accounts_conf=${SLURM_ACCOUNT_SETTINGS:-$defaultAccountSettings}
+
+# run slurmusersettings
+update_commands="$(SLURM_ACCOUNT_SETTINGS=$accounts_conf SLURM_USER_SETTINGS=$user_settings_conf slurmusersettings)"
+echo "$update_commands"
+
+
+if [[ $confirm -eq "-y" ]]; then
+  eval "$update_commands"
+  echo
+  echo "Done."
+else
+  echo '
+==============================================================
+PLEASE CHECK THE ABOVE OUTPUT CAREFULLY!
+==============================================================
+
+
+  '
+  read -p "Apply changes to slurm accounting database? (y/n)" -n 1 -r
+  echo    # (optional) move to a new line
+  if [[ $REPLY =~ ^[Yy]$ ]]
+  then
+    # do dangerous stuff
+    eval "$update_commands"
+    echo
+    echo "Done."
+  else
+    echo "Update aborted."
+  fi
+fi

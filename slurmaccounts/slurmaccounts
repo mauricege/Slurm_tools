@@ -3,8 +3,9 @@
 # Create accounts in the Slurm database 
 # Note: Organization is set equal to Parent
 # Homepage: https://github.com/OleHolmNielsen/Slurm_tools/
+defaultAccountSettings=slurmaccounts/accounts.conf
 
-ACCOUNTS_CONF=/etc/slurm/accounts.conf
+ACCOUNTS_CONF=${SLURM_ACCOUNT_SETTINGS:-$defaultAccountSettings}
 # Syntax of the file ACCOUNTS_CONF is:
 # account:parent:FairShare:Description[:Alias_group]
 # The 5th field Alias_group is optional and must be added manually,
@@ -42,7 +43,7 @@ EOF
 cat $ACCOUNTS_CONF | awk '
 BEGIN {
 	# Read list of existing accounts (parseable output)
-	command="/usr/bin/sacctmgr -nrp show accounts WithAssoc format=Account,Descr,Org,Cluster,ParentName,User,Share"
+	command="sacctmgr -nrp show accounts WithAssoc format=Account,Descr,Org,Cluster,ParentName,User,Share"
 	FS="|"	# Set the Field Separatator to | for the account list
 	while ((command | getline) > 0) {
 		if ($6 != "") continue		# Only modify non-user accounts

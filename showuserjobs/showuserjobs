@@ -235,20 +235,24 @@ BEGIN {
 	account_totals_only=ENVIRON["account_totals_only"]
 	reason_print=ENVIRON["reason_print"]
 	# Then get the list of user full names from passwd lines
-	while ("getent passwd" | getline ) {
-		split($0,b,":")		# Split password line into fields
-		username[b[1]] = b[1]	# Username b[1]
-		fullname[b[1]] = b[5]	# Full name b[5] of this username (b[1])
-	}
-	close("getent passwd")
+	# while ("getent.ldap passwd" | getline ) {
+	# 	split($0,b,":")		# Split password line into fields
+	# 	username[b[1]] = b[1]	# Username b[1]
+	# 	fullname[b[1]] = b[5]	# Full name b[5] of this username (b[1])
+	# }
+	
+	# close("getent.ldap passwd")
+	# if (length(uname)>0) {		# Select username
+	# 	for (u in username) {
+	# 		if (u == uname) userselect=1	# User found
+	# 	}
+	# 	if (userselect != 1) {
+	# 		printf("ERROR: Username %s is not in password file\n", uname)
+	# 		errorexit = -1
+	# 	}
+	# }
 	if (length(uname)>0) {		# Select username
-		for (u in username) {
-			if (u == uname) userselect=1	# User found
-		}
-		if (userselect != 1) {
-			printf("ERROR: Username %s is not in password file\n", uname)
-			errorexit = -1
-		}
+			userselect=1	# User found
 	}
 	# Read list of existing accounts (parseable output)
 	# and get the user cpu limits from the Slurm database

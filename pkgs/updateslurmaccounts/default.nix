@@ -1,25 +1,25 @@
-{ stdenv, lib, makeWrapper, gawk, slurm}:
+{ stdenv, lib, makeWrapper, slurm, slurmusersettings }:
 stdenv.mkDerivation rec {
-  pname = "showuserlimits";
+  pname = "updateslurmaccounts";
   version = "v0.0.1";
 
-  src = ../../showuserlimits;
+  src = ../../slurmaccounts;
 
   nativeBuildInputs = [ makeWrapper ];
 
   installPhase = ''
     mkdir -p $out/bin
-    cp -a showuserlimits $out/bin
-    wrapProgram "$out/bin/showuserlimits" --prefix PATH : "${
+    cp -a updateslurmaccounts $out/bin
+    wrapProgram "$out/bin/updateslurmaccounts" --prefix PATH : "${
         lib.makeBinPath [
-          gawk
           slurm
+          slurmusersettings
         ]}"
   '';
 
 
   meta = with lib; {
-    description = "Print Slurm resource user limits and usage";
+    description = "Sync slurm account to Unix groups.";
     homepage = "https://github.com/OleHolmNielsen/Slurm_tools";
     license = licenses.gpl3;
   };

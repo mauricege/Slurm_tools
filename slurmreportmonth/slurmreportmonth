@@ -108,7 +108,6 @@ then
 fi
 
 # Generate accounting report
-echo $SLURM_CONF
 export SYSTEMNAME=`scontrol show config | grep ClusterName`
 
 REPORT=$REPORT_PREFIX$REPORT_NAME

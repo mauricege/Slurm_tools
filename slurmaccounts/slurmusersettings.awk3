@@ -28,7 +28,7 @@ export GrpTRESRunMins="cpu=3000000"
 # export GrpTRESRunMins="cpu=-1"
 
 # Slurm commands
-export sacctmgr=/usr/bin/sacctmgr
+export sacctmgr=sacctmgr
 
 # User settings configuration file:
 export user_settings_conf=/etc/slurm/user_settings.conf

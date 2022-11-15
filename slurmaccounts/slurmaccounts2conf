@@ -10,7 +10,7 @@
 
 # sacctmgr -snorp output is:
 # Account|Descr|Org|Cluster|Par Name|User|Share|GrpJobs|GrpNodes|GrpCPUs|GrpMem|GrpSubmit|GrpWall|GrpCPUMins|MaxJobs|MaxNodes|MaxCPUs|MaxSubmitJobs|MaxWall|MaxCPUMins|QOS|Def QOS|
-/usr/bin/sacctmgr -snorp show accounts format="Account,Description,Organization,Cluster,ParentName,User,Fairshare" | awk -F"|" '
+sacctmgr -snorp show accounts format="Account,Description,Organization,Cluster,ParentName,User,Fairshare" | awk -F"|" '
 function print_children(a, path)
 {
 	# a: account name
