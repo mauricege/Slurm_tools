@@ -9,7 +9,9 @@ defaultAccountSettings=accounts.conf
 accounts_conf=${SLURM_ACCOUNT_SETTINGS:-$defaultAccountSettings}
 
 # run slurmusersettings
-update_commands="$(SLURM_ACCOUNT_SETTINGS=$accounts_conf SLURM_USER_SETTINGS=$user_settings_conf slurmusersettings)"
+update_commands="$(SLURM_ACCOUNT_SETTINGS=$accounts_conf SLURM_USER_SETTINGS=$user_settings_conf slurmaccounts)"
+newline=$'\n\n'
+update_commands="${update_commands}${newline}$(SLURM_ACCOUNT_SETTINGS=$accounts_conf SLURM_USER_SETTINGS=$user_settings_conf slurmusersettings -c)"
 echo "$update_commands"
 
 

@@ -537,6 +537,7 @@ $3 >= MINUID {
 				if (comm) print "### User " u " with primary UNIX group " g " and account " acct " is a secondary member of the UNIX group " gg
 				if (useraccount[u] != gg) {
 					print sacctmgr " -i add user " u " account=" gg
+					print sacctmgr " -i modify user " u " set defaultaccount=" gg
 				}
 				if (isarray(useraccounts[u]))
 					for (a in useraccounts[u])
@@ -630,7 +631,7 @@ $3 >= MINUID {
 			cmd = "sacct -nX -S \"now-" newuserperiod "\" -b -u " u " | wc -l"
 			cmd | getline jobcount
 			if (comm) print "### User " u " has submitted " jobcount " jobs in the last " newuserperiod
-			if (jobcount > userminjobs) 
+			if (jobcount >= userminjobs) 
 				print sacctmgr " -i modify user where name=" u " set" COMMAND
 			else {
 				if (comm) print "### User " u " should perhaps NOT be updated because job count " jobcount " is <=" userminjobs
@@ -643,6 +644,7 @@ $3 >= MINUID {
 		# New user: command for creating this account
 		if (comm) print "### User " u " group=" unixgroup[GID] " homedir=" HOMEDIR " name=" FULLNAME
 		print sacctmgr " -i create user name=" u COMMAND
+		print sacctmgr " -i modify user where name=" u " set" COMMAND
 		print ""
 	}
 }

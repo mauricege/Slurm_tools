@@ -1,4 +1,4 @@
-{ stdenv, lib, makeWrapper, slurm, slurmusersettings }:
+{ stdenv, lib, makeWrapper, slurm, slurmusersettings, slurmaccounts }:
 stdenv.mkDerivation rec {
   pname = "updateslurmaccounts";
   version = "v0.0.1";
@@ -14,6 +14,7 @@ stdenv.mkDerivation rec {
         lib.makeBinPath [
           slurm
           slurmusersettings
+          slurmaccounts
         ]}"
   '';
 

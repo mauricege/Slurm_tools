@@ -6,6 +6,6 @@ final: prev: {
     slurmreport = prev.callPackage ./slurmreport {};
     slurmusersettings = prev.callPackage ./slurmusersettings {};
     slurmaccounts = prev.callPackage ./slurmaccounts {};
-    updateslurmaccounts = prev.callPackage ./updateslurmaccounts { inherit slurmusersettings; };
+    updateslurmaccounts = prev.callPackage ./updateslurmaccounts { inherit slurmusersettings slurmaccounts; };
   };
 }
