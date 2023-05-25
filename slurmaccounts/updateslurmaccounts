@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-confirm=${1:-1}
+confirm="${1:-n}"
 defaultUserSettings=user_settings.conf
 user_settings_conf="${SLURM_USER_SETTINGS:-$defaultUserSettings}"
 
@@ -9,16 +9,17 @@ defaultAccountSettings=accounts.conf
 accounts_conf=${SLURM_ACCOUNT_SETTINGS:-$defaultAccountSettings}
 
 # run slurmusersettings
-update_commands="$(SLURM_ACCOUNT_SETTINGS=$accounts_conf SLURM_USER_SETTINGS=$user_settings_conf slurmaccounts)"
+update_commands=$(SLURM_ACCOUNT_SETTINGS=$accounts_conf SLURM_USER_SETTINGS=$user_settings_conf slurmaccounts) || exit 1
 newline=$'\n\n'
-update_commands="${update_commands}${newline}$(SLURM_ACCOUNT_SETTINGS=$accounts_conf SLURM_USER_SETTINGS=$user_settings_conf slurmusersettings -c)"
+update_commands=${update_commands}${newline}$(SLURM_ACCOUNT_SETTINGS=$accounts_conf SLURM_USER_SETTINGS=$user_settings_conf slurmusersettings -c) || exit 1
 echo "$update_commands"
 
-
-if [[ $confirm -eq "-y" ]]; then
+if [[ $confirm == "-y" ]]; then
   eval "$update_commands"
   echo
   echo "Done."
+elif [[ $confirm == "-n" ]]; then
+  echo "Aborting."
 else
   echo '
 ==============================================================
