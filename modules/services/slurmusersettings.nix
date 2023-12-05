@@ -147,8 +147,8 @@ in {
           systemd.services = {
             update-slurmaccounts = {
               description = "Automatically update slurmaccounts for system-level users.";
-              requires = ["slurmdbd.service" "nslcd.service"];
-              after = ["slurmdbd.service" "nslcd.service"];
+              requires = ["slurmdbd.service"];
+              after = ["slurmdbd.service"];
               wantedBy = ["multi-user.target"];
               script = "${wrappedUpdateAccounts}/bin/updateslurmaccounts -y";
               path = with pkgs; [nss_pam_ldapd glibc];
