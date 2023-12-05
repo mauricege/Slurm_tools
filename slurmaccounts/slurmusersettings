@@ -143,11 +143,11 @@ export group_tmp="/tmp/group.$$"
 export assoc_tmp="/tmp/assoc.$$"
 export users_tmp="/tmp/users.$$"
 export newusers_tmp="/tmp/newusers.$$"
-$remote getent.ldap group > $group_tmp
-$remote getent group >> $group_tmp
-export eihw_a=$(awk -F':' '/sshusers:/{print $4}' $group_tmp | tr ',' \|)
-$remote getent.ldap passwd | grep -E "($eihw_a)" > $passwd_tmp
-$remote getent passwd | grep -E "($eihw_a)" >> $passwd_tmp
+$remote getent group > $group_tmp
+export user_list=$(awk -F':' '/sshusers:/{print $4}' $group_tmp | tr ',' ' ')
+export unique_groups=$(groups $user_list | tr ' ' '\n' | sort -u | grep -v -e "^$user_list")
+$remote getent group $unique_groups > $group_tmp
+$remote getent passwd $user_list > $passwd_tmp
 
 # Set default time format
 export -n SLURM_TIME_FORMAT
