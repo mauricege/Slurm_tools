@@ -151,7 +151,7 @@ in {
               after = ["slurmdbd.service"];
               wantedBy = ["multi-user.target"];
               script = "${wrappedUpdateAccounts}/bin/updateslurmaccounts -y";
-              path = with pkgs; [nss_pam_ldapd glibc];
+              path = with pkgs; [glibc getent];
             };
             # updateslurmaccounts.text = ''
             #   ${wrappedUpdateAccounts}/bin/updateslurmaccounts -n

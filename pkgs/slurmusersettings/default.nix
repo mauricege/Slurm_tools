@@ -1,22 +1,30 @@
-{ stdenv, lib, makeWrapper, gawk, slurm}:
+{
+  stdenv,
+  lib,
+  makeWrapper,
+  gawk,
+  slurm,
+  getent,
+}:
 stdenv.mkDerivation rec {
   pname = "slurmusersettings";
   version = "v0.0.1";
 
   src = ../../slurmaccounts;
 
-  nativeBuildInputs = [ makeWrapper ];
+  nativeBuildInputs = [makeWrapper];
 
   installPhase = ''
     mkdir -p $out/bin
     cp -a slurmusersettings $out/bin
     wrapProgram "$out/bin/slurmusersettings" --prefix PATH : "${
-        lib.makeBinPath [
-          gawk
-          slurm
-        ]}"
+      lib.makeBinPath [
+        gawk
+        getent
+        slurm
+      ]
+    }"
   '';
-
 
   meta = with lib; {
     description = "Sync slurm account to Unix groups.";
