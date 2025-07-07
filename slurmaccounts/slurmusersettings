@@ -1,13 +1,8 @@
-#!/usr/bin/env bash
-
+#/usr/bin/env bash
 # Manage Slurm user fairshare, QOS and limits:
 # Create, update or delete Slurm user accounts from the passwd file.
 # Update the fairshare, QOS and limits configurations.
 # Homepage: https://github.com/OleHolmNielsen/Slurm_tools/
-
-# Run commands remotely if your Slurm host does not have gawk version 4:
-# Execute commands on a remote host by password-less SSH:
-# export remote="ssh <slurm-host>"
 
 ### CONFIGURE these settings for your cluster
 
@@ -17,12 +12,12 @@
 export newuserperiod="30 days"
 # User limits will not be modified if the user had submitted <= userminjobs
 # during the last $newuserperiod.
-export userminjobs=0
+export userminjobs=50
 # Printing of NEWUSER users: 0=off, 1=summary, 2=details
 export newuserprint=1
 
 # Skip users with UID < MINUID
-export MINUID=100
+export MINUID=1000
 
 # Skip users with locked password by setting skip_locked=1
 # See https://unix.stackexchange.com/questions/109314/two-ways-to-lock-a-password-but-only-one-to-unlock
@@ -30,7 +25,7 @@ export skip_locked=0
 
 # Check if user home directories exist by setting check_homedirs=1
 # This can be a heavy operation if each homedir is NFS-mounted separately.
-export check_homedirs=0
+export check_homedirs=1
 
 # Set ignore_primary_groups=1 in order to ignore the UNIX primary group.
 # This assumes that only UNIX secondary groups are being used for Slurm accounts
@@ -56,11 +51,7 @@ export ignore_primary_groups=1
 # export GrpTRES="cpu=-1"
 # export GrpTRESRunMins="cpu=-1"
 
-# Slurm commands
-export sacctmgr=sacctmgr
-
 # Configure input files:
-
 # User settings configuration file:
 defaultUserSettings=slurmaccounts/user_settings.conf
 export user_settings_conf="${SLURM_USER_SETTINGS:-$defaultUserSettings}"
@@ -77,9 +68,11 @@ export accounts_conf=${SLURM_ACCOUNT_SETTINGS:-$defaultAccountSettings}
 function usage()
 {
 	cat <<EOF
-Usage: $0 [-u username] [-d] [-n] [-c] | [-h]
+Usage: $0 [-u username [-l limits]] | [-a accountname] [-d] [-n] [-c] | [-h]
 where:
 	-u username: Select user <username> (Default is all users)
+	-l limits: Set limits of user <username>
+	-a accountname: Select all users in this accountname
 	-d Print debugging output
 	-n Omit users with non-login shells (-d overrides this)
 	-c Do not print explanatory comments (-d overrides this)
@@ -91,81 +84,75 @@ EOF
 # Parse command options
 #
 export debugflag=0
-export omitnonlogin=1
+export omitnonlogin=0
 export commentsoff=0
+export newlimits=""
 
-while getopts "u:hdnc" options; do
+while getopts "u:l:a:hdnc" options; do
 	case $options in
 		u ) export username=$OPTARG	# Select user
-		    echo "### Select only user $username"
-		    if test -z "`$remote getent.ldap passwd $username`"
-		    then
-			echo "ERROR: User $username is not in the passwd database"
-			exit 1
-		    fi
+		   echo "### Select only user $username"
+		   if [ -z "`getent passwd $username`" ]
+		   then
+			# Just a warning. Delete the user at the end of the script.
+			echo "### WARNING: User $username is not in the passwd database"
+		   fi
+		;;
+		l ) if [ -z "$username" ]
+		   then
+			echo "### ERROR: Please specify the username for new limits"
+		   fi
+		   if [ -z "$newlimits" ]
+		   then
+			export newlimits=$OPTARG	# New limits for this user
+		   else
+			export newlimits="$newlimits $OPTARG"	# Append limits 
+		   fi
+		;;
+		a ) export selectedaccount=$OPTARG	# Select account
+		   echo "### Select only users in account: $selectedaccount"
+		   if [ -z "`getent group $selectedaccount`" ]
+		   then
+			echo "### WARNING: User $selectedaccount is not in the group database"
+		   fi
 		;;
 		d ) export debugflag=1
-		    echo "### Print debugging output"
+		   echo "### Print debugging output"
 		;;
 		n ) export omitnonlogin=1
-		    echo "### Omit users with non-login shells"
+		   echo "### Omit users with non-login shells"
 		;;
 		c ) export commentsoff=1
-		    # Silence this comment:
-		    # echo "### Do not print explanatory comments"
+		   # Silence this comment:
+		   # echo "### Do not print explanatory comments"
 		;;
 		h|*|? ) usage
 		exit 1;;
 	esac
 done
 
-if test ! -f $user_settings_conf
+if [ ! -f $user_settings_conf ]
 then
 	echo "### ERROR: No account settings configuration file $user_settings_conf"
 	exit 1
 fi
 
-# WARNING: GNU gawk version 4.0 or later is required for arrays of arrays
-awk_version=`awk --version | head -1 | awk '{version=$3; split(version,v,"."); print v[1]}'`
-if test "$awk_version" = "3"
-then
-	echo -n "Sorry, gawk version 4.0 or later is required. Your version is: "
-	awk --version | head -1
-	exit 1
-fi
-
 # Process all users in the system passwd database
 
-# We have to store data in temporary files because remote ssh in 
-# the awk BEGIN section apparently breaks awk.
-export passwd_tmp="/tmp/passwd.$$"
-export group_tmp="/tmp/group.$$"
-export assoc_tmp="/tmp/assoc.$$"
-export users_tmp="/tmp/users.$$"
-export newusers_tmp="/tmp/newusers.$$"
-$remote getent group > $group_tmp
-export user_list=$(awk -F':' '/sshusers:/{print $4}' $group_tmp | tr ',' ' ')
-export unique_groups=$(groups $user_list | tr ' ' '\n' | sort -u | grep -v -e "^$user_list")
-$remote getent group $unique_groups > $group_tmp
-$remote getent passwd $user_list > $passwd_tmp
+# Store data in temporary files 
+export group_tmp=`mktemp`
+export assoc_tmp=`mktemp`
+export users_tmp=`mktemp`
+export newusers_tmp=`mktemp`
+getent group > $group_tmp
 
-# Set default time format
+# Force the default time format by unsetting any SLURM_TIME_FORMAT
 export -n SLURM_TIME_FORMAT
 
-# Get the Slurm version
-SLURM_VERSION="`$sacctmgr --version | awk '{print $2}'`"
-# Version comparison, https://apple.stackexchange.com/questions/83939/compare-multi-digit-version-numbers-in-bash/
-function version { echo "$@" | awk -F. '{ printf("%03d%03d%03d", $1,$2,$3); }'; }
- 
 # sacctmgr show associations format (non-default) adding GrpJobsAccrue,MaxJobsAccrue
 # Default format: Cluster|Account|User|Partition|Share|GrpJobs|GrpTRES|GrpSubmit|GrpWall|GrpTRESMins|MaxJobs|MaxTRES|MaxTRESPerNode|MaxSubmitJobs|MaxWall|MaxTRESMins|QOS|Def QOS|GrpTRESRunMins|
 # See "man sacctmgr" section "LIST/SHOW ASSOCIATION FORMAT OPTIONS"
-assocfmt="Cluster,Account,User,Partition,Fairshare,GrpJobs,GrpTRES,GrpSubmit,GrpWall,GrpTRESMins,MaxJobs,MaxTRES,MaxTRESPerNode,MaxSubmitJobs,MaxWall,MaxTRESMins,QOS,DefaultQOS,GrpTRESRunMins"
-# Add parameters from newer Slurm versions
-if test $(version $SLURM_VERSION) -ge $(version 18.08)
-then
-	assocfmt="$assocfmt,GrpJobsAccrue,MaxJobsAccrue"
-fi
+assocfmt="Cluster,Account,User,Partition,Fairshare,GrpJobs,GrpTRES,GrpSubmit,GrpWall,GrpTRESMins,MaxJobs,MaxTRES,MaxTRESPerNode,MaxSubmitJobs,MaxWall,MaxTRESMins,QOS,DefaultQOS,GrpTRESRunMins,GrpJobsAccrue,MaxJobsAccrue"
 
 # Print a header
 if [[ $commentsoff == 0 ]]
@@ -178,23 +165,21 @@ then
 ### Account settings configuration file for UNIX groups is 
 ### `ls -l $user_settings_conf`
 ###
-### Slurm $SLURM_VERSION sacctmgr Format=$assocfmt
 EOF
 fi
 
 # Read the associations
-$remote sacctmgr -snorp show associations format=$assocfmt > $assoc_tmp
+sacctmgr -snrp show associations format=$assocfmt > $assoc_tmp
 
 # Read the users
 # Format for users:
-userfmt="User,DefaultAccount,Account,Cluster,Partition"
-$remote sacctmgr -nrp show user WithAssoc format=$userfmt > $users_tmp
+userfmt="User,DefaultAccount,Account,Cluster"
+sacctmgr -nrp show user WithAssoc format=$userfmt > $users_tmp
 
 # Read the list of NEWUSER users which were added to Slurm recently
-$remote sacctmgr -nrp list transactions Action="Add Users" Start=`date -d "-$newuserperiod" +%m/%d/%y` format=where,time > $newusers_tmp
+sacctmgr -nrp list transactions Action="Add Users" Start=`date -d "-$newuserperiod" +%m/%d/%y` format=Where,TimeStamp,Action > $newusers_tmp
 
-# $remote getent.ldap passwd | gawk -F: '
-cat $passwd_tmp | gawk -F: '
+getent passwd | gawk -F: '
 BEGIN {
 	MINUID = ENVIRON["MINUID"]
 	skip_locked = ENVIRON["skip_locked"]
@@ -202,9 +187,9 @@ BEGIN {
 	ignore_primary_groups = ENVIRON["ignore_primary_groups"]
 	user_settings_conf = ENVIRON["user_settings_conf"]
 	accounts_conf	= ENVIRON["accounts_conf"]
-	sacctmgr	= ENVIRON["sacctmgr"]
 	username	= ENVIRON["username"]
-	# passwd		= ENVIRON["passwd_tmp"]
+	selectedaccount	= ENVIRON["selectedaccount"]
+	newlimits	= ENVIRON["newlimits"]
 	group		= ENVIRON["group_tmp"]
 	assoc		= ENVIRON["assoc_tmp"]
 	users		= ENVIRON["users_tmp"]
@@ -228,7 +213,7 @@ BEGIN {
 	defaults["GrpTRESRunMins"]	= ENVIRON["GrpTRESRunMins"]
 
 	# Create an array of Slurm factors (slurm_factors)
-	string = "partition fairshare GrpTRES GrpTRESMins MaxTRES MaxTRESPerNode MaxTRESMins GrpTRESRunMins QOS DefaultQOS GrpJobsAccrue MaxJobsAccrue MaxJobs MaxSubmitJobs"
+	string = "fairshare GrpTRES GrpTRESMins MaxTRES MaxTRESPerNode MaxTRESMins GrpTRESRunMins QOS DefaultQOS GrpJobsAccrue MaxJobsAccrue MaxJobs MaxSubmitJobs"
 	split(string, slurm_factors, " ")
 
 	# Define index values of the setting[] array
@@ -286,12 +271,11 @@ BEGIN {
 	# Header of sacctmgr -nrp show user: See the "userfmt" variable above.
 	while ((getline < users) > 0) {
 		if (debug > 1) print "Got user " $0
-		# These 5 items constitute a Slurm "association":
+		# These 4 items constitute a Slurm "association":
 		u = $1	# User
 		d = $2	# Default Account
 		a = $3	# Account
 		c = $4	# Cluster
-		p = $5  # Partition
 		if (u != "root") {
 			defaultaccount[u] = d
 			if (a != d) useraccounts[u][a] = a	# Record non-default accounts for user u
@@ -311,7 +295,7 @@ BEGIN {
 	if (newuserprint == 1 && comm) print "### NEWUSER list user(date): " newuserlist
 
 	# Read list of existing accounts (parseable output)
-	# Header of sacctmgr -snorp show associations: See the "assocfmt" variable above.
+	# Header of sacctmgr -snrp show associations: See the "assocfmt" variable above.
 	while ((getline < assoc) > 0) {
 		if (debug > 1) print "Got account " $0
 		a = $2	# account
@@ -327,9 +311,6 @@ BEGIN {
 		} else {
 			item = u	# User account
 			user[u]		= u
-			
-			#print defaultaccount[u] a
-
 			if (defaultaccount[u] == "") {
 				print "\n### NOTICE: No default account for user " u ", setting it to ", a
 				defaultaccount[u] = a
@@ -339,7 +320,6 @@ BEGIN {
 				print "### NOTICE: Default account for user " u "=" useraccount[u] ", cannot set it to " a
 		}
 		# Record the user/group settings
-		setting[item][current]["partition"] = $4
 		setting[item][current]["fairshare"]	= $5
 		setting[item][current]["GrpJobs"]	= $6
 		setting[item][current]["GrpTRES"]	= tolower($7)	# cpu= must be in lowercase
@@ -431,12 +411,6 @@ $3 >= MINUID {
 	password	= $2
 	GID		= $4
 	g = unixgroup[GID]	# UNIX group
-	# Ignore users with per-user group: groupname==username
-	if (g == u) {
-		if (comm) print "### Ignoring users with per-user group: User=" u " group=" g
-		userinformation[u] = "IGNORE"
-		next
-	}
 	if (group2account[g] == "")
 		acct = g
 	else if (group2account[g] == "NOACCOUNT")
@@ -444,6 +418,8 @@ $3 >= MINUID {
 	else
 		# The case where the UNIX group g is an alias for a Slurm account name
 		acct = group2account[g]
+	# if (selectedaccount != acct) next	# Skip account != selectedaccount
+	
 	FULLNAME	= $5
 	HOMEDIR		= $6
 	SHELL		= $7
@@ -455,7 +431,7 @@ $3 >= MINUID {
 			next
 		}
 	}
-	if (SHELL == "/sbin/nologin" || SHELL == "/bin/false") {		# Skip non-login users
+	if (SHELL == "/sbin/nologin" || SHELL == "/bin/false" || SHELL == "/run/current-system/sw/bin/nologin" ) {		# Skip non-login users
 		if (omitnonlogin == 1) usernonlogin[u] = 1	# Flag non-login users 
 		userinformation[u] = "User " u " UNIX account has non-login shell " SHELL
 		next
@@ -519,11 +495,11 @@ $3 >= MINUID {
 		if (useraccount[u] != "") {
 			if (isarray(setting[acct]) && isarray(setting[acct][config])) {
 				if (comm) print "### Existing user " u " account " useraccount[u] " add to account " acct
-				print sacctmgr " -i add user " u " account=" acct
+				print "sacctmgr -i add user " u " account=" acct
 			}
 		} else {
-			 # print "### WARNING: Account " acct " does not exist"
-			 if (comm) print "### NOTICE: User " u " has account=" useraccount[u]
+			# print "### WARNING: Account " acct " does not exist"
+			if (comm) print "### NOTICE: User " u " has account=" useraccount[u]
 		}
 	}
 
@@ -535,21 +511,18 @@ $3 >= MINUID {
 			# Check if account already exists
 			if (gg != acct && useraccounts[u][gg] == "" && length(accountname[gg]) > 0) {
 				if (comm) print "### User " u " with primary UNIX group " g " and account " acct " is a secondary member of the UNIX group " gg
-				if (useraccount[u] != gg) {
-					print sacctmgr " -i add user " u " account=" gg
-					print sacctmgr " -i modify user " u " set defaultaccount=" gg
-				}
 				if (isarray(useraccounts[u]))
 					for (a in useraccounts[u])
 						if (useraccounts[u][a] != gg && useraccounts[u][a] != "")
-							print sacctmgr " -i delete user " u " account=" useraccounts[u][a]
+							print "sacctmgr -i delete user " u " account=" useraccounts[u][a]
 				useraccount[u] == gg
 				if (defaultaccount[u] != gg) {
-					print sacctmgr " -i delete user " u " account=" defaultaccount[u]
+					print "sacctmgr -i delete user " u " account=" defaultaccount[u]
 					COMMAND = COMMAND " defaultaccount=" gg
 				}
 				acct = gg
 			}
+
 		}
 	}
 
@@ -623,6 +596,10 @@ $3 >= MINUID {
 	}
 
 	if (user[u] != "") {
+		if (user[u] == username && newlimits != "") {
+			# Add new user limits to COMMAND
+			COMMAND = COMMAND " " newlimits
+		}
 		# Modify existing user, checking if the jobcount is sufficiently high
 		if (COMMAND != "") {
 			# Print user information
@@ -631,24 +608,24 @@ $3 >= MINUID {
 			cmd = "sacct -nX -S \"now-" newuserperiod "\" -b -u " u " | wc -l"
 			cmd | getline jobcount
 			if (comm) print "### User " u " has submitted " jobcount " jobs in the last " newuserperiod
-			if (jobcount >= userminjobs) 
-				print sacctmgr " -i modify user where name=" u " set" COMMAND
+			if (jobcount > userminjobs) 
+				print "sacctmgr -i modify user where name=" u " set" COMMAND
 			else {
 				if (comm) print "### User " u " should perhaps NOT be updated because job count " jobcount " is <=" userminjobs
 				# print "### User " u " Command would be: sacctmgr -i modify user where name=" u " set" COMMAND
-				print sacctmgr " -i modify user where name=" u " set" COMMAND
+				print "sacctmgr -i modify user where name=" u " set" COMMAND
 			}
 			print ""
 		}
 	} else if (dontcreate[u] == 0) {
 		# New user: command for creating this account
 		if (comm) print "### User " u " group=" unixgroup[GID] " homedir=" HOMEDIR " name=" FULLNAME
-		print sacctmgr " -i create user name=" u COMMAND
-		print sacctmgr " -i modify user where name=" u " set" COMMAND
+		print "sacctmgr -i create user name=" u COMMAND
 		print ""
 	}
 }
 END {
+	if (selectedaccount != "") exit		# Do not delete other accounts in this case
 	# Check for accounts belonging to non-existent users
 	for (u in user) {
 		# Process only the selected username:
@@ -661,11 +638,11 @@ END {
 		if (comm) print "### First delete any non-default accounts for this user"
 		if (isarray(useraccounts[u]))
 			for (a in useraccounts[u])
-				print sacctmgr " -i delete user " u " account=" useraccounts[u][a]
+				print "sacctmgr -i delete user " u " account=" useraccounts[u][a]
 		if (comm) print "### Then delete the user"
-		print sacctmgr " -i delete user " u
+		print "sacctmgr -i delete user " u
 	}
 }'
 
 # Clean-up
-rm -f $passwd_tmp $group_tmp $assoc_tmp $users_tmp $newusers_tmp
+rm -f $group_tmp $assoc_tmp $users_tmp $newusers_tmp
